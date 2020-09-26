@@ -147,6 +147,8 @@ def select_wheel(population):
     selected_population = Population()
     selected_population.individuals = selected_individuals
     selected_population.n = population.n
+    selected_population.pset = population.pset
+    selected_population.head_length = population.head_length
     return(selected_population)
 
 def mutate(population, mutations_per_individual=2):
@@ -261,10 +263,10 @@ def twop_recombine(population, p=0.1):
 def get_next_generation(population):
     # User evaluates fitness
     selected_population = select_wheel(population)
-    mutate(population)
-    invert(population)
-    transpose_is(population)
-    transpose_ris(population)
-    onep_recombine(population)
-    twop_recombine(population)
-    return population
+    mutate(selected_population)
+    invert(selected_population)
+    transpose_is(selected_population)
+    transpose_ris(selected_population)
+    onep_recombine(selected_population)
+    twop_recombine(selected_population)
+    return selected_population
