@@ -1,12 +1,12 @@
-# osc_breeder
+# osc_breeder
 
 A gene expression programming based evolutionary audio synthesizer by Valentin Lageard.
 
-## Requirements
+## Requirements
 
 - pyo : `sudo pip3 install pyo`
 
-## Usage
+## Usage
 
 Launch the notebook and evaluate all cells.
 
@@ -18,7 +18,7 @@ In the last cell, a modest command interface allows you to :
 
 Usually you'll want to listen to all synth in a generation, assign them fitnesses, then reproduce to get a new generation.
 
-## Architecture
+## Architecture
 
 ### Global
 
@@ -26,7 +26,7 @@ Usually you'll want to listen to all synth in a generation, assign them fitnesse
 2. Let the user select the favorite ugen graphs.
 3. Regenerate n ugen graphs based on user selection and genetic operators.
 
-### Audio
+### Audio
 
 pyo ugens are wrapped in functions allowing to control how the genome is expressed as parameters of pyo ugens.
 
@@ -73,7 +73,7 @@ Selecting the primitive set :
 Keyboard mode : 
 - Plug a MIDI keyboard and constrain the synths to have a midi to frequency converter.
 
-## References
+## References
 
 - A. Allik. Gene expression synthesis.
 - C. Ferreira. Gene expression programming: a new adaptive algorithm for solving problems.
