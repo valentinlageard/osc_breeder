@@ -109,9 +109,10 @@ class Gene:
         return fmt.format(*[str(prim) for prim in self.genome])
 
 class Individual:
-    def __init__(self, pset, head_length):
+    def __init__(self, pset, head_length, elite=False):
         self.gene = Gene(pset, head_length)
         self.fitness = 0.1
+        self.elite = elite
     
     def __str__(self):
         return str(self.gene)
@@ -136,7 +137,8 @@ def select_wheel(population):
     # Roulette wheel selection (fitness based)
     total_fitness = sum([individual.fitness for individual in population.individuals])
     selected_individuals = []
-    for _ in range(population.n):
+    elites = [individual for individual in population.individuals if individual.elite]
+    for _ in range(population.n - len(elites)):
         choice = random.uniform(0, total_fitness)
         i = 0
         for individual in population.individuals:
@@ -145,7 +147,8 @@ def select_wheel(population):
                 selected_individuals.append(copy.deepcopy(individual))
                 break
     selected_population = Population()
-    selected_population.individuals = selected_individuals
+    selected_population.individuals = elites
+    selected_population.individuals += selected_individuals
     selected_population.n = population.n
     selected_population.pset = population.pset
     selected_population.head_length = population.head_length
