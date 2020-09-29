@@ -8,6 +8,18 @@ class PrimitiveSet:
     
     def add_function(self, function, arity):
         self.functions.append(Function(function, arity))
+    
+    def add_terminal(self, variable):
+        self.terminals.append(Terminal(variable))
+    
+    def choose_function(self):
+        return random.choice(self.functions)
+    
+    def choose_terminal(self):
+        if random.random() < 0.5 or not self.terminals:
+            return Terminal(random.random())
+        else:
+            return random.choice(self.terminals)
 
 class Function:
     def __init__(self, func, arity):
@@ -33,12 +45,19 @@ class Terminal:
         return str(self.value)
     
     def __str__(self):
-        return str(round(self.value, 3))
+        if isinstance(self.value, str):
+            return self.value
+        else:
+            return str(round(self.value, 3))
 
     def __repr__(self):
-        return str(round(self.value, 3))
+        if isinstance(self.value, str):
+            return self.value
+        else:
+            return str(round(self.value, 3))
 
-def generate_genome(pset, head_length):
+
+def generate_genome(pset, head_length, enforce_root_func=False):
     functions = pset.functions
 
     # Get max arity
@@ -48,22 +67,23 @@ def generate_genome(pset, head_length):
     # Initialize genome
     genome = [None] * (head_length + tail_length)
     # Generate head part (functions and terminals)
-    for i in range(head_length):
+    start = 1 if enforce_root_func else 0
+    if enforce_root_func:
+        genome[0] = pset.choose_function()
+    for i in range(start,head_length):
         if random.random() < 0.5:
-            genome[i] = random.choice(pset.functions)
+            genome[i] = pset.choose_function()
         else:
-            # TODO : choose between a float or a control
-            genome[i] = Terminal(random.random())
+            genome[i] = pset.choose_terminal()
     # Generate tail part (only terminals)
     for i in range(head_length, head_length + tail_length):
-        # TODO : choose between a float or a control
-        genome[i] = Terminal(random.random())
+        genome[i] = pset.choose_terminal()
     return genome
 
 class Gene:
-    def __init__(self, pset, head_length):
+    def __init__(self, pset, head_length, enforce_root_func=False):
         self._head_length = head_length
-        self.genome = generate_genome(pset, head_length)
+        self.genome = generate_genome(pset, head_length, enforce_root_func)
 
     def get_kexpression(self):
         genome = self.genome
@@ -108,30 +128,46 @@ class Gene:
         fmt = "{:<5}|"*len(self.genome)
         return fmt.format(*[str(prim) for prim in self.genome])
 
-class Individual:
-    def __init__(self, pset, head_length, elite=False):
-        self.gene = Gene(pset, head_length)
-        self.fitness = 0.1
-        self.elite = elite
-    
-    def __str__(self):
-        return str(self.gene)
-    
-    def __repr__(self):
-        return str(self.gene)
-
-class Population:
-    def __init__(self):
-        self.individuals = None
-        self.n = None
-        self.pset = None
-        self.head_length = None
-
-    def generate(self, n, pset, head_length):
-        self.individuals = [Individual(pset, head_length) for _ in range(n)]
-        self.n = n
+class Chromosome:
+    def __init__(self, n_genes, pset, head_length, link_func):
+        self.n_genes = n_genes
         self.pset = pset
         self.head_length = head_length
+        self.link_func = link_func
+        self.genes = None
+        self.init_genes()
+    
+    def init_genes(self):
+        self.genes = [Gene(self.pset, self.head_length) for _ in range(self.n_genes)]
+    
+    def enforce_rules(self):
+        pass
+    
+    def __str__(self):
+        print(str(self.genes))
+    
+    def __repr__(self):
+        return "\n".join(["Gene " + str(i) + " : " + repr(gene) + "\n>>> " + str(gene) for i, gene in enumerate(self.genes)])
+
+class Individual:
+    def __init__(self):
+        self.chromosomes = None
+        self.fitness = 0.1
+        self.elite = False
+    
+    def set_fitness(self, fitness):
+        self.fitness = fitness
+    
+    def __str__(self):
+        return str(self.chromosomes)
+    
+    def __repr__(self):
+        return str(self.chromosomes)
+
+class Population:
+    def __init__(self, n):
+        self.n = n
+        self.individuals = None
 
 def select_wheel(population):
     # Roulette wheel selection (fitness based)
@@ -146,122 +182,183 @@ def select_wheel(population):
             if i >= choice:
                 selected_individuals.append(copy.deepcopy(individual))
                 break
-    selected_population = Population()
+    for individual in selected_individuals:
+        individual.fitness = 0.1
+    selected_population = Population(population.n)
     selected_population.individuals = elites
     selected_population.individuals += selected_individuals
-    selected_population.n = population.n
-    selected_population.pset = population.pset
-    selected_population.head_length = population.head_length
     return(selected_population)
 
 def mutate(population, mutations_per_individual=2):
     # Basic mutation of primitives
-    pset = population.pset
-    head_length = population.head_length
-    max_arity = max(p.arity for p in pset.functions)
-    tail_length = head_length * (max_arity - 1) + 1
-    for individual in population.individuals:
-        for _ in range(mutations_per_individual):
-            mutation_index = random.randint(0, head_length + tail_length - 1)
-            if mutation_index < head_length:
-                # In the head, mutate function or terminals
-                if random.random() < 0.5:
-                    individual.gene.genome[mutation_index] = random.choice(pset.functions)
+    individuals = population.individuals
+    n_chromosomes = len(individuals[0].chromosomes)
+    for i in range(n_chromosomes):
+        pset = individuals[0].chromosomes[i].pset
+        head_length = individuals[0].chromosomes[i].head_length
+        n_genes = individuals[0].chromosomes[i].n_genes
+        max_arity = max(p.arity for p in pset.functions)
+        tail_length = head_length * (max_arity - 1) + 1
+        for individual in individuals:
+            chromosome = individual.chromosomes[i]
+            for _ in range(mutations_per_individual):
+                selected_gene = random.randint(0, n_genes - 1)
+                mutation_index = random.randint(0, head_length + tail_length - 1)
+                if mutation_index < head_length:
+                    # In the head, mutate function or terminals
+                    if random.random() < 0.5:
+                        chromosome.genes[selected_gene].genome[mutation_index] = pset.choose_function()
+                    else:
+                        chromosome.genes[selected_gene].genome[mutation_index] = pset.choose_terminal()
                 else:
-                    individual.gene.genome[mutation_index] = Terminal(random.random())
-            else:
-                # In the tail, mutate terminals
-                individual.gene.genome[mutation_index] = Terminal(random.random())
+                    # In the tail, mutate terminals
+                    chromosome.genes[selected_gene].genome[mutation_index] = pset.choose_terminal()
 
 def invert(population, p=0.1):
     # Inversion of portions of genome
-    head_length = population.head_length
-    if head_length > 2:
-        selected_individuals = random.choices(population.individuals, k=int(p * population.n))
-        for individual in selected_individuals:
-            start = random.randint(0,head_length - 2)
-            stop = random.randint(start+1, head_length)
-            individual.gene.genome[start: stop+1] = reversed(individual.gene.genome[start: stop+1])
+    individuals = population.individuals
+    n_chromosomes = len(individuals[0].chromosomes)
+    for i in range(n_chromosomes):
+        head_length = individuals[0].chromosomes[i].head_length
+        if head_length > 2:
+            selected_individuals = random.choices(individuals, k=int(p * population.n))
+            for individual in selected_individuals:
+                chromosome = individual.chromosomes[i]
+                selected_gene = random.randint(0, chromosome.n_genes - 1)
+                start = random.randint(0, head_length - 2)
+                stop = random.randint(start+1, head_length)
+                chromosome.genes[selected_gene].genome[start: stop+1] = reversed(chromosome.genes[selected_gene].genome[start: stop+1])
 
 def transpose_is(population, p=0.1):
     # Non-root transposition
-    pset = population.pset
-    head_length = population.head_length
-    max_arity = max(p.arity for p in pset.functions)
-    tail_length = head_length * (max_arity - 1) + 1
-    gene_length = head_length + tail_length
-    if head_length > 2:
-        selected_individuals = random.choices(population.individuals, k=int(p * population.n))
-        for individual in selected_individuals:
-            is_length = random.randint(0, head_length - 1)
-            start = random.randint(0, gene_length - is_length)
-            stop = start + is_length
-            iseq = individual.gene.genome[start:stop + 1] 
-            insertion_point = random.randint(1, head_length - is_length)
-            individual.gene.genome[insertion_point:insertion_point + is_length + 1] = iseq
+    individuals = population.individuals
+    n_chromosomes = len(individuals[0].chromosomes)
+    for i in range(n_chromosomes):
+        pset = individuals[0].chromosomes[i].pset
+        head_length = individuals[0].chromosomes[i].head_length
+        n_genes = individuals[0].chromosomes[i].n_genes
+        max_arity = max(p.arity for p in pset.functions)
+        tail_length = head_length * (max_arity - 1) + 1
+        gene_length = head_length + tail_length
+        if head_length > 2:
+            selected_individuals = random.choices(individuals, k=int(p * population.n))
+            for individual in selected_individuals:
+                chromosome = individual.chromosomes[i]
+                selected_gene = random.randint(0, n_genes - 1)
+                is_length = random.randint(0, head_length - 1)
+                start = random.randint(0, gene_length - is_length)
+                stop = start + is_length
+                iseq = chromosome.genes[selected_gene].genome[start:stop + 1] 
+                insertion_point = random.randint(1, head_length - is_length)
+                chromosome.genes[selected_gene].genome[insertion_point:insertion_point + is_length + 1] = iseq
 
 def transpose_ris(population, p=0.1):
     # Root transposition
-    pset = population.pset
-    head_length = population.head_length
-    max_arity = max(p.arity for p in pset.functions)
-    tail_length = head_length * (max_arity - 1) + 1
-    gene_length = head_length + tail_length
-    if head_length > 2:
-        selected_individuals = random.choices(population.individuals, k=int(p * population.n))
-        for individual in selected_individuals:
-            function_idx = [i for i, p in enumerate(individual.gene.genome) if isinstance(p, Function)]
-            if not function_idx:
-                continue
-            start = random.choice(function_idx)
-            is_length = random.randint(2, head_length - 1)
-            riseq = individual.gene.genome[start:start+is_length]
-            individual.gene.genome[0:is_length] = riseq
+    individuals = population.individuals
+    n_chromosomes = len(individuals[0].chromosomes)
+    for i in range(n_chromosomes):
+        pset = individuals[0].chromosomes[i].pset
+        head_length = individuals[0].chromosomes[i].head_length
+        n_genes = individuals[0].chromosomes[i].n_genes
+        max_arity = max(p.arity for p in pset.functions)
+        tail_length = head_length * (max_arity - 1) + 1
+        gene_length = head_length + tail_length
+        if head_length > 2:
+            selected_individuals = random.choices(population.individuals, k=int(p * population.n))
+            for individual in selected_individuals:
+                chromosome = individual.chromosomes[i]
+                selected_gene = random.randint(0, n_genes - 1)
+                function_idx = [i for i, p in enumerate(chromosome.genes[selected_gene].genome) if isinstance(p, Function)]
+                if not function_idx:
+                    continue
+                start = random.choice(function_idx)
+                is_length = random.randint(2, head_length - 1)
+                riseq = chromosome.genes[selected_gene].genome[start:start+is_length]
+                chromosome.genes[selected_gene].genome[0:is_length] = riseq    
 
 def onep_recombine(population, p=0.1):
     # One point recombination
-    pset = population.pset
-    head_length = population.head_length
-    max_arity = max(p.arity for p in pset.functions)
-    tail_length = head_length * (max_arity - 1) + 1
-    gene_length = head_length + tail_length
-    # Choose parents1
-    parents1 = random.choices(population.individuals, k=int(p * population.n))
-    for parent1 in parents1:
-        # Select parent 2 different from parent1
-        while True:
-            parent2 = random.choice(population.individuals)
-            if parent1 != parent2:
-                break
-        # Choose recomb point
-        recomb_point = random.randint(0, gene_length - 1)
-        # Buffer swap genomes
-        buffer = parent1.gene.genome[recomb_point:]
-        parent1.gene.genome[recomb_point:] = parent2.gene.genome[recomb_point:]
-        parent2.gene.genome[recomb_point:] = buffer
+    individuals = population.individuals
+    n_chromosomes = len(individuals[0].chromosomes)
+    for i in range(n_chromosomes):
+        pset = individuals[0].chromosomes[i].pset
+        head_length = individuals[0].chromosomes[i].head_length
+        n_genes = individuals[0].chromosomes[i].n_genes
+        max_arity = max(p.arity for p in pset.functions)
+        tail_length = head_length * (max_arity - 1) + 1
+        gene_length = head_length + tail_length
+        # Choose parents1
+        parents1 = random.choices(individuals, k=int(p * population.n))
+        for parent1 in parents1:
+            # Select parent 2 different from parent1
+            while True:
+                parent2 = random.choice(individuals)
+                if parent1 != parent2:
+                    break
+            # Choose recomb point and genes for each parent chromosomes
+            recomb_point = random.randint(0, gene_length - 1)
+            selected_gene1 = random.randint(0, n_genes - 1)
+            selected_gene2 = random.randint(0, n_genes - 1)
+            # Buffer swap genomes
+            buffer = parent1.chromosomes[i].genes[selected_gene1].genome[recomb_point:]
+            parent1.chromosomes[i].genes[selected_gene1].genome[recomb_point:] = parent2.chromosomes[i].genes[selected_gene2].genome[recomb_point:]
+            parent2.chromosomes[i].genes[selected_gene2].genome[recomb_point:] = buffer
 
 def twop_recombine(population, p=0.1):
     # Two point recombination
-    pset = population.pset
-    head_length = population.head_length
-    max_arity = max(p.arity for p in pset.functions)
-    tail_length = head_length * (max_arity - 1) + 1
-    gene_length = head_length + tail_length
-    # Choose parents1
-    parents1 = random.choices(population.individuals, k=int(p * population.n))
-    for parent1 in parents1:
-        # Select parent 2 different from parent1
-        while True:
-            parent2 = random.choice(population.individuals)
-            if parent1 != parent2:
-                break
-        # Choose recomb start and end
-        recomb_point = random.randint(0, gene_length - 1)
-        recomb_end = random.randint(recomb_point, gene_length - 1)
-        # Buffer swap genome
-        buffer = parent1.gene.genome[recomb_point:recomb_end+1]
-        parent1.gene.genome[recomb_point:recomb_end+1] = parent2.gene.genome[recomb_point:recomb_end+1]
-        parent2.gene.genome[recomb_point:recomb_end+1] = buffer
+    individuals = population.individuals
+    n_chromosomes = len(individuals[0].chromosomes)
+    for i in range(n_chromosomes):
+        pset = individuals[0].chromosomes[i].pset
+        head_length = individuals[0].chromosomes[i].head_length
+        n_genes = individuals[0].chromosomes[i].n_genes
+        max_arity = max(p.arity for p in pset.functions)
+        tail_length = head_length * (max_arity - 1) + 1
+        gene_length = head_length + tail_length
+        # Choose parents1
+        parents1 = random.choices(individuals, k=int(p * population.n))
+        for parent1 in parents1:
+            # Select parent 2 different from parent1
+            while True:
+                parent2 = random.choice(individuals)
+                if parent1 != parent2:
+                    break
+            # Choose recomb start and end
+            recomb_point = random.randint(0, gene_length - 1)
+            recomb_end = random.randint(recomb_point, gene_length - 1)
+            selected_gene1 = random.randint(0, n_genes - 1)
+            selected_gene2 = random.randint(0, n_genes - 1)
+            # Buffer swap genome
+            buffer = parent1.chromosomes[i].genes[selected_gene1].genome[recomb_point:recomb_end+1]
+            parent1.chromosomes[i].genes[selected_gene1].genome[recomb_point:recomb_end+1] = parent2.chromosomes[i].genes[selected_gene2].genome[recomb_point:recomb_end+1]
+            parent2.chromosomes[i].genes[selected_gene2].genome[recomb_point:recomb_end+1] = buffer
+
+def gene_recombine(population, p=0.1):
+    # Exchange genes between chromosomes
+    individuals = population.individuals
+    n_chromosomes = len(individuals[0].chromosomes)
+    for i in range(n_chromosomes):
+        n_genes = individuals[0].chromosomes[i].n_genes
+        # Choose parents1
+        parents1 = random.choices(individuals, k=int(p * population.n))
+        for parent1 in parents1:
+            # Select parent 2 different from parent1
+            while True:
+                parent2 = random.choice(individuals)
+                if parent1 != parent2:
+                    break
+            # Choose genes to swap
+            selected_gene1 = random.randint(0, n_genes - 1)
+            selected_gene2 = random.randint(0, n_genes - 1)
+            # Buffer swap genes
+            buffer = parent1.chromosomes[i].genes[selected_gene1].genome[:]
+            parent1.chromosomes[i].genes[selected_gene1].genome = parent2.chromosomes[i].genes[selected_gene2].genome[:]
+            parent2.chromosomes[i].genes[selected_gene2].genome = buffer
+
+def enforce_rules(population):
+    for individual in population.individuals:
+        for chromosome in individual.chromosomes:
+            chromosome.enforce_rules()
 
 def get_next_generation(population):
     # User evaluates fitness
@@ -272,4 +369,6 @@ def get_next_generation(population):
     transpose_ris(selected_population)
     onep_recombine(selected_population)
     twop_recombine(selected_population)
+    gene_recombine(selected_population)
+    enforce_rules(selected_population)
     return selected_population

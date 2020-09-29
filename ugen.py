@@ -3,44 +3,56 @@ import pyo
 # Interpolations utility
 
 def lerp(x, x_a, x_b, y_a, y_b):
+    # Linear interpolation
     return (y_a + (y_b - y_a) * ((x - x_a)/(x_b - x_a)))
 
 def nlerp(x, y_a, y_b):
+    # Normamalized linear interpolation
     return (lerp(x, 0, 1, y_a, y_b))
 
+def nferp(x):
+    # Normalized frequency interpolation
+    return (27.0 * 2.0 ** (x * 10.0))
+
 # Wrapper functions around ugens
+
+## UTILITIES
+
+def mix(inputs):
+    inputs = [pyo.Sig(input) if isinstance(input, float) else input for input in inputs]
+    return pyo.Mix(inputs)
 
 ## SYNTHS
 
 def blit(f=0.5, harms=0.5):
-    return pyo.Blit(freq=nlerp(f, 27, 6912),
+    return pyo.Blit(freq=nferp(f),
                     harms=nlerp(harms, 0, 100))
 
 def crossfm(f=0.5, ratio=0.5, ind1=0.5, ind2=0.5):
-    return pyo.CrossFM(carrier=nlerp(f, 27, 6912),
+    return pyo.CrossFM(carrier=nferp(f),
                        ratio=ratio,
                        ind1=nlerp(ind1, 0, 2),
                        ind2=nlerp(ind2, 0, 2))
 
 def fsine(f=0.5):
-    return pyo.FastSine(freq=nlerp(f, 27, 6912),
+    return pyo.FastSine(freq=nferp(f),
                         initphase=0,
                         quality=1)
 
 def phasor(f=0.5, phase=0.5):
-    return pyo.Phasor(freq=nlerp(f, 27, 6912),
+    return pyo.Phasor(freq=nferp(f),
                       phase=phase)
 
 def rcosc(f=0.5, sharp=0.5):
-    return pyo.RCOsc(freq=nlerp(f, 27, 6912),
+    return pyo.RCOsc(freq=nferp(f),
                      sharp=sharp)
 
 def sineloop(f=0.5, feedback=0.5):
-    return pyo.SineLoop(freq=nlerp(f, 27, 6912),
+    return pyo.SineLoop(freq=nferp(f),
                         feedback=feedback)
 
 def supersaw(f=0.5, detune=0.5, bal=0.5):
-    return pyo.SuperSaw(freq=nlerp(f, 27, 6912),
+    return pyo.SuperSaw(freq=nferp(f),
                         detune=detune,
                         bal=bal)
 

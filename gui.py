@@ -1,7 +1,19 @@
 import tkinter as tk
 from functools import partial
-import handler
 import globals
+import gep
+from ugen import *
+
+def pause_synth():
+    if globals.synth is not None and isinstance(globals.synth, pyo.PyoObject):
+        globals.synth.stop()
+        
+def reproduce():
+    pause_synth()
+    globals.population = gep.get_next_generation(globals.population)
+
+def set_fitness(id, fitness):
+    globals.population.individuals[id - 1].set_fitness(fitness)
 
 # GUI UTILITIES
 
@@ -32,7 +44,7 @@ class Cell(tk.Frame):
             activebackground = "white",
             activeforeground = "black",
             master = self.fitness_frame,
-            command = partial(handler.assign_fitness, self.id, 0))
+            command = partial(set_fitness, id, 0))
         self.fitness_one = tk.Button(
             text = "1",
             width = 1,
@@ -42,7 +54,7 @@ class Cell(tk.Frame):
             activebackground = "white",
             activeforeground = "black",
             master = self.fitness_frame,
-            command = partial(handler.assign_fitness, self.id, 1))
+            command = partial(set_fitness, id, 1))
         self.fitness_four = tk.Button(
             text = "4",
             width = 1,
@@ -52,7 +64,7 @@ class Cell(tk.Frame):
             activebackground = "white",
             activeforeground = "black",
             master = self.fitness_frame,
-            command = partial(handler.assign_fitness, self.id, 4))
+            command = partial(set_fitness, id, 4))
         self.cellbutton.pack()
         self.fitness_frame.pack()
         self.fitness_zero.pack(side=tk.LEFT)
@@ -60,9 +72,13 @@ class Cell(tk.Frame):
         self.fitness_four.pack(side=tk.LEFT)
     
     def play_synth_and_update_synth_print(self):
-        handler.play_synth(self.id)
+        print("==============")
+        pause_synth()
+        print(str(globals.population.individuals[self.id - 1]))
+        globals.synth = tanh(globals.population.individuals[self.id - 1].get_patch())
+        globals.synth.out()
         self.parent.parent.update_synth_print(self.id)
-
+    
 class CellGrid(tk.Frame):
     def __init__(self, parent, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
@@ -95,26 +111,27 @@ class Gui(tk.Frame):
             bg = "black",
             fg = "white",
             master = parent,
-            command = handler.reproduce)
+            command = reproduce)
         self.text_box = tk.Label(
             textvariable = self.synth_print,
-            width = 80,
-            height = 18,
+            width = 120,
+            height = 25,
             bg = "black",
             fg = "white",
             bd = 1,
             highlightbackground="white",
+            justify=tk.LEFT,
+            anchor="nw",
             master = parent,
-            wraplength=600)
+            wraplength=1000)
         self.cellgrid = CellGrid(self, bg="black")
         self.reproduce_button.pack()
         self.cellgrid.pack()
         self.text_box.pack()
     
     def update_synth_print(self, id):
-        to_print = [None, None, None, None]
-        to_print[0] = ("=" * 15) + "GENOTYPE" + ("=" * 15)
-        to_print[1] = repr(globals.population.individuals[id - 1].gene.genome)
-        to_print[2] = ("=" * 15) + "PHENOTYPE" + ("=" * 15)
-        to_print[3] = str(globals.population.individuals[id - 1].gene)
+        to_print = []
+        to_print.append("Individual n°" + str(id))
+        to_print.append("Fitness : " + str(globals.population.individuals[id - 1].fitness))
+        to_print.append(repr(globals.population.individuals[id - 1]))
         self.synth_print.set("\n".join(to_print))

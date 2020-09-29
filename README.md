@@ -41,13 +41,15 @@ To get next generation :
 5. Root segment transposition.
 6. 1 point recombination.
 7. 2 point recombination.
+8. Gene recombination.
 
-## Changelog
+## Changelog
 
 Version|Changes
 -|-
 0.1|First working prototype
 0.2|Tk gui, tanh compression added, ugens with inputs managed, more ugens
+0.3|Multigenic chromosomes, multichromsomals individuals, more flexible gep architecture, general refactoring
 
 ## TODO
 - Implement more ugens.
@@ -57,10 +59,8 @@ Version|Changes
 - Modify algorithm to check for audio frequencies in synths and regenerate them to have only synths with sound.
 - Make a nice graphical interface.
 - Develop a way to selectively inject ugens in genome to constrain a range of application.
-- Individuals have chromosomes composed of multiple genomes mixed together.
-- Individuals have 2 chromosomes : 1 for synthesis and 1 for signal processing.
 
-## Interactions ideas
+## Interactions ideas
 
 Assigning fitness :
 - Manually assign a fitness.
